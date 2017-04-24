@@ -94,7 +94,7 @@ export default user;
 {% codeblock project/root/ %}
 npm install webpack --save-dev
 {% endcodeblock %}
-## 配置webpack
+## 使用webpack
 推荐使用独立的webpack.config.js文件作为webpack的配置文件
 {% codeblock project/root/webpack.config.js %}
 module.exports = {
@@ -108,4 +108,170 @@ module.exports = {
 上面的配置文件展示了webpack运行所必须的最简配置项，由于webpack使用Node作为运行环境，很明显其配置文件使用了CommonJs风格。
 entry   表明项目的入口文件，即Js代码从何处开始执行。
 output  描述了打包后的目标文件，包括其文件名及输出路径。
-webpack将从入口文件开始，把所有的依赖打包成一个bundle.js，其运行效果等同于在ES6规范下期望的运行效果，以前文中ES6风格模块的代码为例：
+## webpack原理
+webpack将从入口文件开始，把所有的依赖打包成一个bundle.js，其运行效果等同于在ES6规范下期望的运行效果，以前文中ES6风格模块的代码为例，使用webpack将其打包之后的bundle.js如下：
+{% codeblock bundle.js lang:js %}
+/******/ (function(modules) { // webpackBootstrap
+/******/ 	// The module cache
+/******/ 	var installedModules = {};
+/******/
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/
+/******/ 		// Check if module is in cache
+/******/ 		if(installedModules[moduleId]) {
+/******/ 			return installedModules[moduleId].exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = installedModules[moduleId] = {
+/******/ 			i: moduleId,
+/******/ 			l: false,
+/******/ 			exports: {}
+/******/ 		};
+/******/
+/******/ 		// Execute the module function
+/******/ 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+/******/
+/******/ 		// Flag the module as loaded
+/******/ 		module.l = true;
+/******/
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/
+/******/
+/******/ 	// expose the modules object (__webpack_modules__)
+/******/ 	__webpack_require__.m = modules;
+/******/
+/******/ 	// expose the module cache
+/******/ 	__webpack_require__.c = installedModules;
+/******/
+/******/ 	// identity function for calling harmony imports with the correct context
+/******/ 	__webpack_require__.i = function(value) { return value; };
+/******/
+/******/ 	// define getter function for harmony exports
+/******/ 	__webpack_require__.d = function(exports, name, getter) {
+/******/ 		if(!__webpack_require__.o(exports, name)) {
+/******/ 			Object.defineProperty(exports, name, {
+/******/ 				configurable: false,
+/******/ 				enumerable: true,
+/******/ 				get: getter
+/******/ 			});
+/******/ 		}
+/******/ 	};
+/******/
+/******/ 	// getDefaultExport function for compatibility with non-harmony modules
+/******/ 	__webpack_require__.n = function(module) {
+/******/ 		var getter = module && module.__esModule ?
+/******/ 			function getDefault() { return module['default']; } :
+/******/ 			function getModuleExports() { return module; };
+/******/ 		__webpack_require__.d(getter, 'a', getter);
+/******/ 		return getter;
+/******/ 	};
+/******/
+/******/ 	// Object.prototype.hasOwnProperty.call
+/******/ 	__webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
+/******/
+/******/ 	// __webpack_public_path__
+/******/ 	__webpack_require__.p = "";
+/******/
+/******/ 	// Load entry module and return exports
+/******/ 	return __webpack_require__(__webpack_require__.s = 1);
+/******/ })
+/************************************************************************/
+/******/ ([
+/* 0 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+var user = {
+    username: "FebV",
+    password: "mypass"
+}
+
+/* harmony default export */ __webpack_exports__["a"] = (user);
+
+/***/ }),
+/* 1 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__user__ = __webpack_require__(0);
+
+console.log(__WEBPACK_IMPORTED_MODULE_0__user__["a" /* default */].username);
+
+/***/ })
+/******/ ]);
+{% endcodeblock %}
+可以看到，webpack打包后的bundle.js通过一个匿名的立即执行函数来加载模块，下面我们逐行分析这段代码。
+{% codeblock line 1-3 lang:js %}
+ (function(modules) { // webpackBootstrap
+ 	// The module cache
+ 	var installedModules = {};
+{% endcodeblock %}
+在括号中声明的匿名函数很明显是一个需要立即执行的函数，使用这种方式可以不声明全局变量，也就不污染命名空间。jQuery就是以这样的方式执行，只在执行过程中通过`window.jQuery = jQuery`来对外暴露对象。
+`installedModules`变量则代表了已经加载的模块。加载模块需要执行模块中的代码，如果能将模块要导出的变量缓存起来，那么第二次加载此模块就可以缓存的值而无需再一次执行模块中的代码。
+{% codeblock line 5-27 lang:js %}
+// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/
+/******/ 		// Check if module is in cache
+/******/ 		if(installedModules[moduleId]) {
+/******/ 			return installedModules[moduleId].exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = installedModules[moduleId] = {
+/******/ 			i: moduleId,
+/******/ 			l: false,
+/******/ 			exports: {}
+/******/ 		};
+/******/
+/******/ 		// Execute the module function
+/******/ 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+/******/
+/******/ 		// Flag the module as loaded
+/******/ 		module.l = true;
+/******/
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+{% endcodeblock %}
+这段代码在立即执行函数的内部定义了`__webpack_require__`函数，通过名称我们可以了解到这个函数主要用来加载模块。可以看到，如果`installedModules`数组中已经存在了要加载的模块，那么就可以直接返回对应模块的输出变量；如果不存在，那就向`installedModules`中添加这个模块，并设置其标识`i`为其id，是否已被加载`l`为false，输出变量为空对象。之后通过`call`函数执行这个模块中的代码，即加载这个模块。在后面可以看到，模块中的代码被webpack封装在一个匿名函数中。在加载完成后，模块的是否被加载属性`l`被设置为true，最后这个函数将返回模块的输出变量。
+{% codeblock line 30- lang:js %}
+/******/ 	// expose the modules object (__webpack_modules__)
+/******/ 	__webpack_require__.m = modules;
+/******/
+/******/ 	// expose the module cache
+/******/ 	__webpack_require__.c = installedModules;
+/******/
+/******/ 	// identity function for calling harmony imports with the correct context
+/******/ 	__webpack_require__.i = function(value) { return value; };
+/******/
+/******/ 	// define getter function for harmony exports
+/******/ 	__webpack_require__.d = function(exports, name, getter) {
+/******/ 		if(!__webpack_require__.o(exports, name)) {
+/******/ 			Object.defineProperty(exports, name, {
+/******/ 				configurable: false,
+/******/ 				enumerable: true,
+/******/ 				get: getter
+/******/ 			});
+/******/ 		}
+/******/ 	};
+/******/
+/******/ 	// getDefaultExport function for compatibility with non-harmony modules
+/******/ 	__webpack_require__.n = function(module) {
+/******/ 		var getter = module && module.__esModule ?
+/******/ 			function getDefault() { return module['default']; } :
+/******/ 			function getModuleExports() { return module; };
+/******/ 		__webpack_require__.d(getter, 'a', getter);
+/******/ 		return getter;
+/******/ 	};
+/******/
+/******/ 	// Object.prototype.hasOwnProperty.call
+/******/ 	__webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
+/******/
+/******/ 	// __webpack_public_path__
+/******/ 	__webpack_require__.p = "";
+{% endcodeblock %}
+得益于JavaScript一切皆对象的概念和动态属性的特性，即使函数本身也可以被随意添加属性。在上面的代码中我们可以看到，webpack给`__webpack_require__`函数添加了一些属性，例如所有的模块`m`、已经被加载的模块`c`和一些与ES6模块相关的函数等等。webpack内部默认以CommonJs规范实现，所以遇到ES6模块需要做一些微调，这里便不再赘述。
