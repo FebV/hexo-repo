@@ -3,7 +3,7 @@ title: 模块化与webpack & webpack-dev-server
 date: 2017-04-22 09:24:44
 tags: 
 - 前端
-- JavaScipt
+- JavaScript
 ---
 {% asset_img what-is-webpack.png %}
 # 模块化
@@ -109,7 +109,7 @@ module.exports = {
 上面的配置文件展示了webpack运行所必须的最简配置项，由于webpack使用Node作为运行环境，很明显其配置文件使用了CommonJs风格。
 entry   表明项目的入口文件，即Js代码从何处开始执行。
 output  描述了打包后的目标文件，包括其文件名及输出路径。
-## webpack原理
+## bundle.js分析
 webpack将从入口文件开始，把所有的依赖打包成一个bundle.js，其运行效果等同于在ES6规范下期望的运行效果，以前文中ES6风格模块的代码为例，使用webpack将其打包之后的bundle.js如下：
 {% codeblock bundle.js lang:js %}
 /******/ (function(modules) { // webpackBootstrap
@@ -378,12 +378,14 @@ module.exports = {
 {% endcodeblock %}
 UglifyJsPlugin可以将bundle.js中的空格和换行都删去，并将函数名和变量名换为很短的字符串，从而缩减bundle.js文件的体积，较小的体积可以改善页面加载时间。
 
-# webpack-dev-server
+# Webpack-dev-server
 {% asset_img file_pro.png %}
 在编写好html文档之后，双击html文件即可在浏览器中打开，这样十分方便，但会有一些问题。
 直接双击打开是使用的file协议，而非一般的http协议，在file协议下，例如aJax等操作都会因为浏览器的安全策略受限，所以我们需要搭建一个本地服务器，以使用JavaScript的全部功能，webpack-dev-server就可以作为本地服务器。
 ## HotModuleReplacement
 webpack-dev-server除了作为静态文件服务器之外，还有很多功能，例如自动刷新的功能。平时我们在修改完JavaScript代码后，需要手动刷新浏览器才能看到新代码的执行效果。webpack可以在我们保存JavaScript文件时自动刷新浏览器。
+{% asset_img websocket-hot.png  %}
+实现的原理是在页面中嵌入js脚本，使用websocket与webpack-dev-server相连，当webpack-dev-server检测到代码文件变动时，就重新打包，然后通过websocket通知浏览器刷新页面。
 {% codeblock project/root/webpack.config.js %}
 var webpack = require('webpack')
 
@@ -412,7 +414,7 @@ module.exports = {
 }
 {% endcodeblock %}
 
-## historyApiFallback & proxy
+## HistoryApiFallback & Proxy
 devServer还有两个常用的属性：historyApiFallback & proxy
 
 historyApiFallback主要用于单页面应用刷新时404问题。

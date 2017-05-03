@@ -3,8 +3,8 @@
 ## Source: https://github.com/hexojs/hexo/
 
 # Site
-title: Hexo
-subtitle:
+title: Zhao Yifan's Blog
+subtitle: look outside
 description:
 author: FebV
 language: en
@@ -12,8 +12,8 @@ timezone:
 
 # URL
 ## If your site is put in a subdirectory, set url as 'http://yoursite.com/child' and root as '/child/'
-url: https://febv.github.io/blog/
-root: /blog/
+url: http://zhaoyifan.space
+root: /
 permalink: :year/:month/:day/:title/
 permalink_defaults:
 
