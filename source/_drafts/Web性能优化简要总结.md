@@ -20,7 +20,7 @@ DNS又叫做域名系统，也就是各个网站的网址。与ip地址相比，
 *Queueing：请求处于队列。当前有更高优先级的请求或者该域名已经有六个TCP连接时会出现。*
 *Stalled：任何使请求处于队列的原因同样也会使请求阻塞。*
 *DNS Lookup：浏览器正在解析域名到对应的ip地址。*
-*Proxy negotiation: 浏览器正在与代理服务器协商。当网站后端使用了反向代理服务器时，会出现该情况。*
+*Proxy negotiation: 浏览器正在与代理服务器协商。当使用了代理时，会出现该情况。*
 *Request sent: 浏览器正在发送请求。*
 *Service Worker Preparation： 浏览器正在启动Service Worker。*
 *Request to Service Worker： 浏览器正在向Service Worker发送请求。*
@@ -30,10 +30,49 @@ DNS又叫做域名系统，也就是各个网站的网址。与ip地址相比，
 例如SSL代表SSL的握手阶段耗时。
 下面我们对于每一个字段仔细探讨一下优化策略。
 # 加载优化
-我们将`Queue, Stalled, Proxy negotiation, DNS Lookup, Initial connection, SSL, Request sent, Content Download, Service Worker`都视为加载阶段。
+我们将下列字段都视为加载阶段。
+* Queue & Stalled
+* Proxy negotiation
+* DNS Lookup
+* Initial connection
+* SSL
+* Request sent
+* Content Download
 ## Queue & Stalled
 由开发者网站我们可以了解到，Queue & Stalled主要由两个原因，一个是此时有更高优先级的连接，另一个是浏览器对同一个域名最多会有六个TCP连接。
 对于来自更高优先级连接的阻塞我们没有更好的办法，连接的优先级并不能手动来控制，例如VoIP（实时语音通话）的优先级势必会比打开一个网页要高很多。
+### 域名发散
 浏览器对于一个同一个域名下的资源最多有六个并行的TCP连接，这会节省服务器的内存，也会减少线路上的拥塞程度。但作为网站，希望尽可能的利用带宽，那就需要用到`domain sharing`域名发散。所谓发散，就是将网站的资源分散到多个域名，以避免浏览器的单域名并行限制。这就是大多数网站都会有单独的`static`静态资源域名。
+## Proxy negotiation
+当使用了如VPN、Socks5等类型的本地代理时，浏览器需要先与本地代理通信。尽管这并不是必要的步骤但使用代理可以带来很多安全方面的好处，例如隐藏自己的真实ip等。
+## DNS Lookup
+前面已经提及DNS的作用和机制。在浏览器向一个陌生的域名发起请求前，需要进行DNS Lookup，也就是DNS寻址。DNS寻址使用UDP 53号端口。在使用有线以太网时，UDP可靠性较高不易丢失数据包，而在移动端等弱网环境下，UDP数据包十分容易受到干扰而丢失或失效，继而需要重新查询，这导致DNS寻址花费时间较长。
+### 域名收敛
+所以在移动端条件下，经常应用域名收敛替代域名发散的策略。将资源域名收敛到一至两个，能够很大程度上减少需要DNS寻址的次数，不至于在寻址过程花费太多时间。
+## Initial connection
+这里的Initial connection指代与远端服务器建立TCP链接，包括SSL握手的步骤。TCP链接属于TCP/IP协议栈的传输层，是不能够变更的，但服务端仍然有优化的策略。
+### BBR Congestion Control
+拥塞控制是TCP协议中十分重要的部分，简单介绍一下TCP的拥塞控制。  
+#### 拥塞控制
+难以计数的路由节点和线路构成了庞大的网络链路，是网络通信的基础。网络链路上承载着纷错交叉的TCP连接，端到端通信的数据包就依赖于这些TCP连接。如果将网络链路比作高速公路网，那么一条条货运专线就是TCP连接，在货运专线上飞驰的货车就是一个个数据包。就像节假日热门的收费站会堵车排队，如果某条链路上的数据包太多（例如很多人用2M带宽下载电影），那么就会出现拥塞。假如服务端不知道中途出现了拥塞的情况，还在一直全速发送数据包，那就会进一步加剧拥塞，最后导致节点瘫痪。在TCP协议被设计时，这种情况就被考虑到并且处理的十分优雅。
+#### TCP 慢启动
+TCP协议使用了一种被称为“慢启动”的拥塞控制算法。在刚建立TCP连接时，发送数据的一方（一般是服务端）首先仅发送一个数据包，如果在正常时限内收到回执确认，则说明链路拥塞情况良好，下一轮会发送两个数据包，再下一轮八个，十六个、三十二个……如此指数上升。当出现丢包的情况时，说明出现拥塞，此时将发送的数据包数减半，然后每轮以一递增，直到再次出现拥塞情况，进入下一轮”慢启动“。
+{% asset_img slow-start.jpg %}
+现代的TCP拥塞控制还加入了”快恢复“的特性，但基于”慢启动”的TCP拥塞控制算法判定拥塞的标识始终是出现丢包。
+#### BBR
+BBR全称是Bottleneck Bandwidth and Round-trip propagation time，大意是瓶颈带宽和往返传播时间，是Google在2016年发表的新型TCP拥塞控制算法。BBR算法与现在的默认拥塞控制算法相比，不同的地方主要在于其可以更加充分的利用“延迟高、带宽大“的链路。BBR并不会在一出现丢包就判定线路拥塞，而是可以容忍一定的丢包率，从而在延迟稍高的链路上更加激进地利用带宽。在服务器和客户端之间网络状况较差的情况下（服务器在境外）效果格外明显。
+在Linux Kernel 4.9下可以手动开启BBR算法。
+```
+# Linux 4.9 CentOS
+echo 'net.core.default_qdisc=fq' | sudo tee -a /etc/sysctl.conf
+echo 'net.ipv4.tcp_congestion_control=bbr' | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
+## SSL
+SSL是
+### SSL 步骤
+### HTTP 2.0
+## Request sent
+### LocalStorage
 # 后端优化
 # 前端优化
