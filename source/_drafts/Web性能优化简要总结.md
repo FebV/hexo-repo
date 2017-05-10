@@ -69,7 +69,7 @@ echo 'net.ipv4.tcp_congestion_control=bbr' | sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
 ```
 ## SSL
-SSL是
+SSL全称是Secure Sockets Layer,
 ### SSL 步骤
 ### HTTP 2.0
 ## Request sent
