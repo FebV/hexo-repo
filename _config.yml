@@ -70,3 +70,4 @@ theme: next
 deploy:
   type: git
   repo: git@github.com:FebV/blog.git
+  branch: gh-pages
